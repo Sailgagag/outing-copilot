@@ -1,0 +1,4 @@
+{"_comment": "SYNTHETIC fixture for tests only - not real NWS data.",
+ "type": "FeatureCollection",
+ "features": [{"properties": {"event": "Wind Advisory", "severity": "Moderate",
+   "headline": "Wind Advisory issued for test purposes", "ends": "2026-10-15T18:00:00-07:00"}}]}
