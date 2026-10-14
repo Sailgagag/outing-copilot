@@ -8,3 +8,7 @@ state.json
 # demo video (large files)
 video/
 *.mp4
+
+# keep build intermediates private; ship the finished demo
+!video/outing-copilot-demo.mp4
+!video/outing-copilot-demo.srt

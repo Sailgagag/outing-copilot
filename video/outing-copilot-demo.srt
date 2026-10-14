@@ -1,0 +1,135 @@
+1
+00:00:00,300 --> 00:00:04,364
+Every day, millions of people ask a voice assistant about the weather.
+
+2
+00:00:04,464 --> 00:00:06,851
+But what they actually want to know is:
+
+3
+00:00:06,951 --> 00:00:08,510
+should I go out, and when?
+
+4
+00:00:08,610 --> 00:00:10,296
+Outing Copilot answers that.
+
+5
+00:00:10,696 --> 00:00:12,461
+It's a self-hosted MCP server.
+
+6
+00:00:12,561 --> 00:00:16,360
+For each question it chains five free public services:
+
+7
+00:00:16,460 --> 00:00:22,424
+location, hourly forecast, air quality, public holidays and official weather alerts.
+
+8
+00:00:22,524 --> 00:00:25,023
+And it turns them into one decision:
+
+9
+00:00:25,123 --> 00:00:29,644
+the best window, a go, maybe or skip verdict, and what to bring.
+
+10
+00:00:30,044 --> 00:00:36,007
+It runs over Streamable HTTP on the official MCP Python SDK.
+
+11
+00:00:36,107 --> 00:00:40,568
+Here it negotiates spec version 2025-11-25.
+
+12
+00:00:40,968 --> 00:00:43,074
+This is a simulated Alexa+ session.
+
+13
+00:00:43,174 --> 00:00:48,443
+A real MCP client connects to the server, and the household starts talking.
+
+14
+00:00:48,843 --> 00:00:50,820
+First, it learns where home is.
+
+15
+00:00:50,920 --> 00:00:54,040
+That's saved, so it still knows next week.
+
+16
+00:00:54,440 --> 00:00:56,676
+When's the best time to walk the dog?
+
+17
+00:00:56,776 --> 00:01:04,157
+It only looks at hours that start after sunrise and end by sunset, and scores each one for that activity.
+
+18
+00:01:04,257 --> 00:01:06,864
+Dogs don't mind a drizzle, picnics do.
+
+19
+00:01:06,964 --> 00:01:07,648
+The answer:
+
+20
+00:01:07,748 --> 00:01:11,852
+8 to 9 AM, in one sentence, plus a card for screen devices.
+
+21
+00:01:12,252 --> 00:01:17,597
+Tell it someone in the family has asthma, and it uses a stricter air-quality limit from then on.
+
+22
+00:01:17,697 --> 00:01:24,120
+Ask about a two-hour picnic this weekend, and it compares Saturday and Sunday, and warns you it'll be chilly.
+
+23
+00:01:24,520 --> 00:01:25,109
+Or plan ahead:
+
+24
+00:01:25,209 --> 00:01:29,280
+it ranks the whole week for a run, and Sunday wins with 98.
+
+25
+00:01:29,380 --> 00:01:31,330
+It's upfront about gaps, too:
+
+26
+00:01:31,430 --> 00:01:32,037
+"Heads up:
+
+27
+00:01:32,137 --> 00:01:39,460
+air-quality data isn't available that far out, so I've docked those days." It knows what it doesn't know.
+
+28
+00:01:39,860 --> 00:01:41,408
+Some city names are ambiguous.
+
+29
+00:01:41,508 --> 00:01:51,608
+Ask about Portland, and it tells you which one it picked, Portland, Oregon, with a 10 to 11 AM walk tomorrow, and how to switch if you meant Portland, Maine.
+
+30
+00:01:52,008 --> 00:02:03,660
+All 47 tests pass, offline, against recorded API responses, including weather alerts, missing air-quality data, ambiguous places and upstream errors.
+
+31
+00:02:04,059 --> 00:02:04,841
+Outing Copilot:
+
+32
+00:02:04,941 --> 00:02:06,888
+from forecast to decision.
+
+33
+00:02:06,988 --> 00:02:10,825
+The code is open source, and it needs no API keys.
+
+34
+00:02:10,925 --> 00:02:12,400
+Thanks for watching.
