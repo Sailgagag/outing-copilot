@@ -1,4 +1,5 @@
 """End-to-end tests through a real MCP client, with all HTTP served from fixtures."""
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -9,11 +10,13 @@ from outing_copilot.server import create_server
 from outing_copilot.store import Store
 
 FX = Path(__file__).parent / "fixtures"
+# Fixtures were recorded 2026-10-14 ~02:30 Seattle time; pin the clock there.
+NOW = lambda: datetime(2026, 10, 14, 9, 30, tzinfo=timezone.utc)  # noqa: E731
 
 
 @pytest.fixture
 def server(tmp_path):
-    return create_server(transport=fixture_transport(FX), store=Store(tmp_path / "state.json"))
+    return create_server(transport=fixture_transport(FX), store=Store(tmp_path / "state.json"), now=NOW)
 
 
 async def call(server, name, args=None):
@@ -49,7 +52,7 @@ async def test_bad_day_is_friendly(server):
 async def test_memory_persists_across_sessions(server, tmp_path):
     await call(server, "remember_place", {"nickname": "Home", "place": "Seattle"})
     # brand new server instance, same state file = a later session
-    s2 = create_server(transport=fixture_transport(FX), store=Store(tmp_path / "state.json"))
+    s2 = create_server(transport=fixture_transport(FX), store=Store(tmp_path / "state.json"), now=NOW)
     places = await call(s2, "list_saved_places")
     assert "home" in places["places"]
     r = await call(s2, "find_best_time", {"place": "home", "activity": "bike"})
@@ -77,3 +80,10 @@ async def test_preferences(server):
 async def test_streamable_http_app_builds(server):
     app = server.streamable_http_app()
     assert any(getattr(r, "path", "") == "/mcp" for r in app.routes)
+
+
+async def test_past_hours_are_never_suggested(tmp_path):
+    late = lambda: datetime(2026, 10, 15, 0, 30, tzinfo=timezone.utc)  # 17:30 in Seattle  # noqa: E731
+    s = create_server(transport=fixture_transport(FX), store=Store(tmp_path / "s.json"), now=late)
+    r = await call(s, "find_best_time", {"place": "Seattle", "activity": "walk", "day": "today"})
+    assert r["ok"] and r["window"]["start"] >= "2026-10-14T17:00"

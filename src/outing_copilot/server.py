@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
+from typing import Callable
 from typing import Any
 
 import httpx
@@ -31,8 +32,28 @@ INSTRUCTIONS = (
 READ_ONLY = ToolAnnotations(readOnlyHint=True, openWorldHint=True)
 
 
-def create_server(transport: httpx.AsyncBaseTransport | None = None, store: Store | None = None) -> MCPServer:
+def create_server(
+    transport: httpx.AsyncBaseTransport | None = None,
+    store: Store | None = None,
+    now: Callable[[], datetime] | None = None,
+) -> MCPServer:
+    """Build the server. ``now`` (UTC) is injectable so tests with recorded data stay deterministic."""
     store = store or Store()
+    now = now or (lambda: datetime.now(timezone.utc))
+
+    def _drop_past(hours, fc):
+        local_now = (now() + timedelta(seconds=fc.get("utc_offset_seconds", 0))).replace(tzinfo=None)
+        cutoff = local_now.replace(minute=0, second=0, microsecond=0)
+        return [h for h in hours if h.time >= cutoff]
+
+    def _dedupe(reasons):
+        seen, out = set(), []
+        for r in reasons:
+            key = r.split(" (")[-1] if "feels like" in r else r.split(" ")[-1] if "%" in r else r.split(" ")[0]
+            if key not in seen:
+                seen.add(key); out.append(r)
+        return out
+
     mcp = MCPServer(name="outing-copilot", title="Outing Copilot", version="0.1.0", instructions=INSTRUCTIONS)
 
     async def _locate(http: httpx.AsyncClient, place: str) -> dict[str, Any]:
@@ -95,13 +116,13 @@ def create_server(transport: httpx.AsyncBaseTransport | None = None, store: Stor
         except (ValueError, clients.UpstreamError) as exc:
             return _err(str(exc))
 
-        hours = score_hours(act, fc, air, sensitive_to_air=bool(store.prefs().get("sensitive_to_air")))
+        hours = _drop_past(score_hours(act, fc, air, sensitive_to_air=bool(store.prefs().get("sensitive_to_air"))), fc)
         wins = [(d, best_window(hours, d, duration_hours)) for d in days]
         wins = [(d, w) for d, w in wins if w]
         if not wins:
             return _err("That day is outside my 7-day forecast window, or there's no daylight left today.")
         d, w = max(wins, key=lambda x: x[1].score)
-        reasons = sorted({r for hs in w.hours for r in hs.reasons})
+        reasons = _dedupe([r for hs in w.hours for r in hs.reasons])
         tips = gear_tips(w)
         dayname = "today" if d == today else ("tomorrow" if (d - today).days == 1 else "on " + d.strftime("%A"))
         verdict = w.verdict()
@@ -147,7 +168,7 @@ def create_server(transport: httpx.AsyncBaseTransport | None = None, store: Stor
                 hol = await _holidays(http, loc, days)
         except (ValueError, clients.UpstreamError) as exc:
             return _err(str(exc))
-        hours = score_hours(act, fc, air, sensitive_to_air=bool(store.prefs().get("sensitive_to_air")))
+        hours = _drop_past(score_hours(act, fc, air, sensitive_to_air=bool(store.prefs().get("sensitive_to_air"))), fc)
         ranked = []
         for d in days:
             w = best_window(hours, d, duration_hours)
@@ -216,7 +237,10 @@ def main() -> None:
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=8765)
     a = ap.parse_args()
-    create_server().run("streamable-http", host=a.host, port=a.port)
+    import os
+    fixed = os.environ.get("OUTING_NOW")  # e.g. 2026-10-14T16:00:00+00:00, used by the offline demo
+    clock = (lambda: datetime.fromisoformat(fixed)) if fixed else None
+    create_server(now=clock).run("streamable-http", host=a.host, port=a.port)
 
 
 if __name__ == "__main__":
