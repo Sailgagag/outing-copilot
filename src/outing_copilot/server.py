@@ -116,7 +116,8 @@ def create_server(
         except (ValueError, clients.UpstreamError) as exc:
             return _err(str(exc))
 
-        hours = _drop_past(score_hours(act, fc, air, sensitive_to_air=bool(store.prefs().get("sensitive_to_air"))), fc)
+        sensitive = bool(store.prefs().get("sensitive_to_air"))
+        hours = _drop_past(score_hours(act, fc, air, sensitive_to_air=sensitive), fc)
         wins = [(d, best_window(hours, d, duration_hours)) for d in days]
         wins = [(d, w) for d, w in wins if w]
         if not wins:
@@ -132,6 +133,8 @@ def create_server(
             speech += " Watch out for " + ", ".join(reasons[:2]) + "."
         if tips:
             speech += " Tip: " + tips[0] + "."
+        if w.aqi_unknown and sensitive:
+            speech += " I don't have air-quality data for that time yet, so I scored it cautiously."
         if alerts:
             speech += f" There's an active {alerts[0]['event']} for this area."
         if d.isoformat() in hol:
@@ -149,6 +152,7 @@ def create_server(
             "gear_tips": tips,
             "alerts": alerts,
             "holiday": hol.get(d.isoformat()),
+            "air_quality": "unknown" if w.aqi_unknown else "known",
             "card": {
                 "title": f"{act.label.title()} · {loc['name']} · {d.strftime('%a %b %d')}",
                 "text": f"{fmt_time(w.start)}–{fmt_time(w.end)} · score {round(w.score)}/100 · {verdict.upper()}",
@@ -168,7 +172,8 @@ def create_server(
                 hol = await _holidays(http, loc, days)
         except (ValueError, clients.UpstreamError) as exc:
             return _err(str(exc))
-        hours = _drop_past(score_hours(act, fc, air, sensitive_to_air=bool(store.prefs().get("sensitive_to_air"))), fc)
+        sensitive = bool(store.prefs().get("sensitive_to_air"))
+        hours = _drop_past(score_hours(act, fc, air, sensitive_to_air=sensitive), fc)
         ranked = []
         for d in days:
             w = best_window(hours, d, duration_hours)
@@ -177,6 +182,7 @@ def create_server(
                     "day": d.isoformat(), "weekday": d.strftime("%A"), "score": round(w.score),
                     "verdict": w.verdict(), "start": w.start.isoformat(), "end": w.end.isoformat(),
                     "holiday": hol.get(d.isoformat()),
+                    "air_quality": "unknown" if w.aqi_unknown else "known",
                 })
         if not ranked:
             return _err("I couldn't build a weekly outlook for that place.")
@@ -190,6 +196,10 @@ def create_server(
         worst = min(ranked, key=lambda r: r["score"])
         if worst["score"] < 50:
             speech += f" Avoid {worst['weekday']}."
+        unknown = [r["weekday"] for r in ranked if r["air_quality"] == "unknown"]
+        if unknown and sensitive:
+            listed = unknown[0] if len(unknown) == 1 else ", ".join(unknown[:-1]) + " and " + unknown[-1]
+            speech += f" Air-quality data isn't available yet for {listed}, so I scored those days cautiously."
         return {"ok": True, "speech": speech, "place": loc, "activity": act.key, "best": best, "days": ranked,
                 "card": {"title": f"{act.label.title()} week · {loc['name']}",
                          "text": " | ".join(f"{r['weekday'][:3]} {r['score']}" for r in ranked)}}

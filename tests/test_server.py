@@ -87,3 +87,13 @@ async def test_past_hours_are_never_suggested(tmp_path):
     s = create_server(transport=fixture_transport(FX), store=Store(tmp_path / "s.json"), now=late)
     r = await call(s, "find_best_time", {"place": "Seattle", "activity": "walk", "day": "today"})
     assert r["ok"] and r["window"]["start"] >= "2026-10-14T17:00"
+
+
+async def test_week_outlook_asthma_flags_unknown_air_days(server):
+    await call(server, "set_preferences", {"sensitive_to_air": True})
+    r = await call(server, "week_outlook", {"place": "Seattle", "activity": "run"})
+    unknown = [d for d in r["days"] if d["air_quality"] == "unknown"]
+    assert unknown, "days 6-7 have no AQI upstream"
+    assert all(d["score"] < 100 for d in unknown)
+    assert "Air-quality data isn't available yet" in r["speech"]
+    assert unknown[-1]["weekday"] in r["speech"]

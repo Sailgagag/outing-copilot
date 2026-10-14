@@ -110,9 +110,18 @@ async def forecast(http: httpx.AsyncClient, lat: float, lon: float, days: int = 
     )
 
 
+# Open-Meteo Air Quality accepts forecast_days 0..7 (8 is rejected), but measured on 2026-10-14
+# it only fills us_aqi for roughly the first 4.8 days; later hours come back as null.
+# We request all 7 days to line up with the weather forecast and treat nulls as "unknown".
+AIR_FORECAST_DAYS = 7
+
+
 async def air_quality(http: httpx.AsyncClient, lat: float, lon: float) -> dict[str, Any]:
     return await _get(
-        http, AIR_URL, {"latitude": lat, "longitude": lon, "hourly": "us_aqi,pm2_5", "timezone": "auto", "forecast_days": 5}
+        http,
+        AIR_URL,
+        {"latitude": lat, "longitude": lon, "hourly": "us_aqi,pm2_5", "timezone": "auto",
+         "forecast_days": AIR_FORECAST_DAYS},
     )
 
 

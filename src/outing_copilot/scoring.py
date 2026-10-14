@@ -55,6 +55,9 @@ class HourScore:
     aqi: float | None = None
 
 
+UNKNOWN_AQI_PENALTY = 15.0
+
+
 def score_hour(
     act: Activity,
     *,
@@ -85,7 +88,13 @@ def score_hour(
     if act.uv_sensitive and uv is not None and uv >= 7:
         s -= (uv - 6) * 4
         why.append(f"UV index {uv:.0f}")
-    if aqi is not None:
+    if aqi is None:
+        # No air-quality data for this hour. Conservative rule: a household that is
+        # sensitive to air never gets a perfect score on an unknown hour.
+        if sensitive_to_air:
+            s -= UNKNOWN_AQI_PENALTY
+            why.append("air quality unknown")
+    else:
         limit = 50 if sensitive_to_air else 100
         if aqi > limit:
             s -= (aqi - limit) * 0.8
@@ -147,6 +156,10 @@ class Window:
     end: datetime
     score: float
     hours: list[HourScore]
+
+    @property
+    def aqi_unknown(self) -> bool:
+        return any(h.aqi is None for h in self.hours)
 
     def verdict(self) -> str:
         if self.score >= 75:

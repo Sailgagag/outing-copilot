@@ -55,3 +55,18 @@ def test_best_window_on_recorded_forecast_is_daylight_and_contiguous():
     assert (w.end - w.start).total_seconds() == 7200
     assert 0 <= w.score <= 100
     assert isinstance(gear_tips(w), list)
+
+
+def test_unknown_aqi_never_perfect_when_sensitive():
+    act = resolve_activity("run")
+    plain, _ = score_hour(act, feels_f=60, rain_pct=0, wind_mph=0, uv=0, aqi=None)
+    strict, why = score_hour(act, feels_f=60, rain_pct=0, wind_mph=0, uv=0, aqi=None, sensitive_to_air=True)
+    assert plain == 100
+    assert strict < 100 and "air quality unknown" in why
+
+
+def test_air_fixture_covers_seven_days_with_trailing_nulls():
+    air = json.loads((FX / "airquality_seattle.json").read_text())
+    times, aqi = air["hourly"]["time"], air["hourly"]["us_aqi"]
+    assert len(times) == 168  # 7 days requested
+    assert aqi[0] is not None and aqi[-1] is None  # tail is unknown upstream
