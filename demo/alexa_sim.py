@@ -22,6 +22,7 @@ from pathlib import Path
 
 from mcp import Client
 
+PINNED_PROTOCOL = "2025-11-25"
 ROOT = Path(__file__).resolve().parents[1]
 
 SCRIPT = [
@@ -53,7 +54,11 @@ def wait_for(port: int, timeout: float = 15) -> None:
 
 
 async def converse(url: str) -> None:
-    async with Client(url) as client:
+    # Pin the 2025-11-25 spec: mode="legacy" is the SDK's documented switch for the
+    # initialize handshake (Alexa+ targets MCP 2025-11-25, not the 2026 discover flow).
+    async with Client(url, mode="legacy") as client:
+        if client.protocol_version != PINNED_PROTOCOL:
+            raise RuntimeError(f"expected MCP {PINNED_PROTOCOL}, negotiated {client.protocol_version}")
         info = client.server_info
         print(f"[connected to {info.name if info else '?'} via Streamable HTTP, protocol {client.protocol_version}]")
         tools = [t.name for t in (await client.list_tools()).tools]

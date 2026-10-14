@@ -4,3 +4,7 @@ __pycache__/
 .pytest_cache/
 *.tmp
 state.json
+
+# demo video (large files)
+video/
+*.mp4
