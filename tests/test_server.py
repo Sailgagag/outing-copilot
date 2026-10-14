@@ -119,3 +119,15 @@ async def test_set_preferences_bad_activity_is_friendly(server):
     assert "skydiving" in r["speech"] and "Try a walk" in r["speech"]
     assert set(r) >= {"ok", "speech", "card"}
 
+
+@pytest.mark.parametrize("nick", ["", "   ", "\t"])
+async def test_remember_place_rejects_blank_nickname(server, nick):
+    r = await call(server, "remember_place", {"nickname": nick, "place": "Seattle"})
+    assert r["ok"] is False and "What should I call this place" in r["speech"]
+
+
+async def test_remember_place_strips_nickname(server):
+    r = await call(server, "remember_place", {"nickname": "  Grandma  ", "place": "Seattle"})
+    assert r["nickname"] == "grandma"
+    assert "remember Grandma as" in r["speech"]
+    assert "grandma" in (await call(server, "list_saved_places"))["places"]

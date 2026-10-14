@@ -218,6 +218,9 @@ def create_server(
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, idempotentHint=True, openWorldHint=True))
     async def remember_place(nickname: str, place: str) -> dict[str, Any]:
         """Save a place under a nickname (e.g. 'home', 'the office', 'grandma') for later requests."""
+        nickname = (nickname or "").strip()
+        if not nickname:
+            return _err("What should I call this place? Please give it a short name, like home or work.")
         try:
             async with clients.make_http_client(transport) as http:
                 loc = await clients.geocode(http, place)
