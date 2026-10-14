@@ -130,7 +130,8 @@ def score_hours(
     for i, t in enumerate(h["time"]):
         ts = datetime.fromisoformat(t)
         win = daylight.get(ts.date().isoformat())
-        if win and not (win[0] - timedelta(minutes=30) <= ts <= win[1] - timedelta(minutes=30)):
+        # Daylight only: the whole hour must start at/after sunrise and end by sunset.
+        if win and not (win[0] <= ts and ts + timedelta(hours=1) <= win[1]):
             continue
         get = lambda k: (h.get(k) or [None] * len(h["time"]))[i]  # noqa: E731
         feels = get("apparent_temperature")

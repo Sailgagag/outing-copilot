@@ -70,3 +70,16 @@ def test_air_fixture_covers_seven_days_with_trailing_nulls():
     times, aqi = air["hourly"]["time"], air["hourly"]["us_aqi"]
     assert len(times) == 168  # 7 days requested
     assert aqi[0] is not None and aqi[-1] is None  # tail is unknown upstream
+
+
+def test_hours_are_strictly_within_daylight():
+    fc = json.loads((FX / "forecast_seattle.json").read_text())
+    hours = score_hours(resolve_activity("walk"), fc, None)
+    from datetime import datetime, timedelta
+    sun = {d: (datetime.fromisoformat(r), datetime.fromisoformat(s))
+           for d, r, s in zip(fc["daily"]["time"], fc["daily"]["sunrise"], fc["daily"]["sunset"])}
+    for h in hours:
+        rise, sset = sun[h.time.date().isoformat()]
+        assert h.time >= rise and h.time + timedelta(hours=1) <= sset
+    first = min(h.time for h in hours if h.time.date().isoformat() == "2026-10-14")
+    assert first.hour == 8  # sunrise 07:26 -> first full daylight hour starts 08:00
