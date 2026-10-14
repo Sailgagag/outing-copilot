@@ -8,7 +8,7 @@
 **Mini challenges:** none by default. (Open Source only if a separate, *additional* repo/PR is
 made; AWS Builder only if an AWS service is actually used — see notes at the end.)
 
-**Repository:** <GitHub URL — public, MIT license visible in the About section>
+**Repository:** https://github.com/Sailgagag/outing-copilot
 **Video:** <YouTube/Vimeo public URL>
 
 ---
@@ -21,7 +21,7 @@ read-out leaves the user to do the maths. We wanted Alexa+ to just answer.
 ## What it does
 Outing Copilot is a self-hosted MCP server. Ask about an activity — walk, run, bike ride, picnic,
 playground trip or dog walk — for a place and a day, and it returns:
-- the best daylight window (only future hours),
+- the best daylight window (whole hours between sunrise and sunset, only future hours, 1–6 hours long),
 - a verdict: go, maybe, or skip,
 - the concerns behind it (rain chance, feels-like temperature, wind, UV, air quality),
 - what to bring (rain jacket, warm layer, sunscreen, water, mask),
@@ -30,6 +30,13 @@ playground trip or dog walk — for a place and a day, and it returns:
 Answers come as a one-sentence `speech` field for voice, a `card` for screen devices, and full
 structured data. It also remembers things across sessions: nicknamed places ("home", "grandma")
 and household preferences such as asthma (which switches to a stricter AQI limit).
+
+It is careful about what it doesn't know. Air-quality forecasts only cover the first four to five
+days, so later days are marked unknown; in asthma mode those days are scored cautiously and the
+answer says so ("Air-quality data isn't available yet for Monday and Tuesday…"). Ambiguous places
+are named out loud ("I picked Portland, Oregon; say Portland, Maine if you meant that one"), and a
+nickname that is also a real city triggers a heads-up. Every error — a missing place, an
+out-of-range duration, an unknown activity, a service outage — comes back as one speakable sentence.
 
 ## How we built it
 - Official MCP Python SDK (`mcp` 2.3.0), `MCPServer`, served over Streamable HTTP at `/mcp`.
@@ -40,10 +47,12 @@ and household preferences such as asthma (which switches to a stricter AQI limit
 - A pure-Python scoring engine gives every daylight hour a 0–100 score per activity (each activity
   has its own comfort range, wind limit and rain tolerance) and finds the best contiguous window.
 - A small JSON store keeps places and preferences between sessions.
-- 16 automated tests run fully offline against recorded API responses; a demo script plays a
+- 47 automated tests run fully offline against recorded API responses; a demo script plays a
   simulated Alexa+ conversation through a real MCP client.
 
 ## Challenges we ran into
+- Air-quality coverage is shorter than the weather forecast. We measured it (the API accepts up to 7
+  days but fills AQI for only about 4–5), then treated the gap as "unknown" instead of "clean air".
 - Making answers short enough to speak but still explain *why*. We cap each spoken answer at the
   window, the top concerns, one tip, and an alert.
 - Not suggesting a time that has already passed: the forecast is in the location's local time, so
@@ -109,9 +118,3 @@ decision-style answers. We'd like a way to test against Alexa+ directly.
 | Start an MCP server from a tutorial | `from mcp.server.fastmcp import FastMCP` with mcp 2.3.0 | Import works | `ModuleNotFoundError` pointing to migration guide | Medium | Use `mcp.server.mcpserver.MCPServer` | Link the 2.x quickstart from the hackathon Resources page |
 | Confirm required spec version | Connected with the default client | 2025-11-25 | Negotiated 2026-07-28 | Low | Legacy-mode client / manual `initialize` with 2025-11-25 | State which versions Alexa+ accepts |
 | Test against Alexa+ | Looked for a way to register a self-hosted MCP server | A test console | None found without Preview access | High | Simulated Alexa+ client | Provide a sandbox endpoint for hackathon entrants |
-
-## Notes for the entrant (delete before submitting)
-- Open Source mini-challenge requires a *new, additional* open-source project or a contribution to
-  an existing public repo, alongside the primary submission — this repo alone doesn't qualify.
-- AWS Builder needs a documented AWS service integration (or Kiro Crew used during development).
-  Nothing in this repo uses AWS yet; don't claim it.

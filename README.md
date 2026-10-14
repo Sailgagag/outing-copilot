@@ -23,14 +23,34 @@ No API keys, no accounts, no secrets in this repo.
 | Tool | What it does |
 |---|---|
 | `find_best_time(place, activity, day, duration_hours)` | Best daylight window, verdict (go / maybe / skip), concerns, gear tips, alerts, holiday |
-| `week_outlook(place, activity, duration_hours)` | Ranks the next 7 days and picks the best one |
-| `remember_place(nickname, place)` | Saves "home", "grandma", etc. — persists across sessions |
+| `week_outlook(place, activity, duration_hours)` | Ranks the next 7 days and picks the best one; flags days with no air-quality data |
+| `remember_place(nickname, place)` | Saves "home", "grandma", etc. — persists across sessions; warns if the nickname is also a real city |
 | `list_saved_places()` | Lists saved places |
 | `set_preferences(sensitive_to_air, default_activity)` | e.g. asthma in the household → stricter AQI limit (50 instead of 100) |
 
 Activities: `walk`, `run`, `bike`, `picnic`, `playground`, `dog_walk` (with aliases like "jogging",
 "cycling"). Every result carries a short `speech` string written to be spoken and a `card` for
 screen devices.
+
+## Behaviour details
+
+- **Daylight windows:** only whole hours that start at or after sunrise and end by sunset, and never
+  hours that have already passed. `duration_hours` must be 1–6.
+- **Air quality coverage:** air quality is requested for the same 7 days as the forecast, but
+  Open-Meteo currently only fills the US AQI for about the first 4–5 days (measured 2026-10-14;
+  `forecast_days` above 7 is rejected). Hours without data are marked `air_quality: "unknown"`. With
+  `sensitive_to_air` on, unknown hours lose 15 points (so they can never score 100) and the spoken
+  answer says which days have no air-quality data yet.
+- **Ambiguous places:** "Portland" picks the top geocoder match and says so —
+  *"…in Portland, Oregon… I picked Portland, Oregon; say Portland, Maine if you meant that one."*
+  Users can say "Portland, Maine" directly. Another place counts as a real alternative when it has
+  the same name and at least 20,000 people.
+- **Nicknames:** trimmed, must not be blank, and a saved nickname wins over a city with the same
+  name; if it shadows a sizeable real city the server says so when saving and when using it.
+- **Errors are speakable:** bad arguments (missing place, "lots" of hours, unknown activity),
+  unknown places and upstream outages all come back as one sentence, never a raw stack or pydantic
+  message. Transient network errors are retried once.
+- **NWS etiquette:** requests send `User-Agent: outing-copilot (+https://github.com/Sailgagag/outing-copilot; https://github.com/Sailgagag/outing-copilot/issues)`.
 
 ## Protocol
 
@@ -78,8 +98,9 @@ is a hard-coded stand-in for the Alexa+ LLM; every answer comes from the server.
 pytest -q
 ```
 
-All upstream HTTP is served from `tests/fixtures/` (real responses recorded on 2026-10-14, plus one
-clearly-marked synthetic NWS alert), so tests are offline and deterministic.
+All upstream HTTP is served from `tests/fixtures/` (real responses recorded on 2026-10-14, including
+geocoder results for Seattle, Portland and Paris and a 7-day air-quality response whose tail is
+null upstream, plus one clearly-marked synthetic NWS alert), so tests are offline and deterministic.
 
 ## Layout
 
