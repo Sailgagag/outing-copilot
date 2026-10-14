@@ -23,7 +23,11 @@ NWS_ALERTS_URL = "https://api.weather.gov/alerts/active"
 
 
 class UpstreamError(RuntimeError):
-    """Raised when a public API fails; tools turn this into a friendly message."""
+    """Raised when a public API fails. ``str()`` is a sentence safe to speak; details stay in ``detail``."""
+
+    def __init__(self, detail: str):
+        super().__init__("I couldn't reach the weather service just now. Please try again in a minute.")
+        self.detail = detail
 
 
 def fixture_transport(fixture_dir: str | Path) -> httpx.MockTransport:
@@ -72,12 +76,21 @@ def make_http_client(transport: httpx.AsyncBaseTransport | None = None) -> httpx
 async def _get(
     http: httpx.AsyncClient, url: str, params: dict[str, Any] | None = None, headers: dict[str, str] | None = None
 ) -> Any:
-    try:
-        r = await http.get(url, params=params, headers=headers)
-        r.raise_for_status()
-        return r.json()
-    except (httpx.HTTPError, ValueError) as exc:
-        raise UpstreamError(f"{url} failed: {exc}") from exc
+    last: Exception | None = None
+    for _attempt in range(2):  # one retry for transient network/TLS hiccups
+        try:
+            r = await http.get(url, params=params, headers=headers)
+            if r.status_code >= 500:
+                r.raise_for_status()
+            r.raise_for_status()
+            return r.json()
+        except httpx.HTTPStatusError as exc:
+            last = exc
+            if exc.response.status_code < 500:
+                break
+        except (httpx.HTTPError, ValueError) as exc:
+            last = exc
+    raise UpstreamError(f"{url} failed: {last}") from last
 
 
 # Another same-named place this big makes the name worth disambiguating out loud.
