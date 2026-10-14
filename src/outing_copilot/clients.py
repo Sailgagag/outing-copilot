@@ -80,8 +80,6 @@ async def _get(
     for _attempt in range(2):  # one retry for transient network/TLS hiccups
         try:
             r = await http.get(url, params=params, headers=headers)
-            if r.status_code >= 500:
-                r.raise_for_status()
             r.raise_for_status()
             return r.json()
         except httpx.HTTPStatusError as exc:
