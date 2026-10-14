@@ -131,3 +131,35 @@ async def test_remember_place_strips_nickname(server):
     assert r["nickname"] == "grandma"
     assert "remember Grandma as" in r["speech"]
     assert "grandma" in (await call(server, "list_saved_places"))["places"]
+
+
+async def test_ambiguous_city_is_named_in_speech(server):
+    r = await call(server, "find_best_time", {"place": "Portland", "activity": "walk", "day": "tomorrow"})
+    assert r["ok"]
+    assert "in Portland, Oregon" in r["speech"]
+    assert "say Portland, Maine if you meant that one" in r["speech"]
+    assert r["place"]["alternatives"][0] == "Portland, Maine"
+
+
+async def test_qualified_city_is_not_ambiguous(server):
+    r = await call(server, "find_best_time", {"place": "Portland, Maine", "day": "tomorrow"})
+    assert r["ok"] and r["place"]["region"] == "Maine"
+    assert "if you meant" not in r["speech"]
+
+
+async def test_unambiguous_city_keeps_short_name(server):
+    r = await call(server, "find_best_time", {"place": "Seattle", "day": "tomorrow"})
+    assert "in Seattle tomorrow" in r["speech"] and "I picked" not in r["speech"]
+
+
+async def test_nickname_that_is_a_real_city_warns(server):
+    r = await call(server, "remember_place", {"nickname": "Paris", "place": "Seattle"})
+    assert r["ok"] and "Paris, France is also a real place" in r["speech"]
+    r = await call(server, "find_best_time", {"place": "paris", "day": "tomorrow"})
+    assert r["place"]["name"] == "Seattle"
+    assert "saved place paris, not the city" in r["speech"]
+
+
+async def test_ordinary_nickname_has_no_warning(server):
+    r = await call(server, "remember_place", {"nickname": "home", "place": "Seattle"})
+    assert "Heads up" not in r["speech"]

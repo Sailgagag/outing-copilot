@@ -41,8 +41,9 @@ def fixture_transport(fixture_dir: str | Path) -> httpx.MockTransport:
         host = request.url.host
         if host == "geocoding-api.open-meteo.com":
             name = request.url.params.get("name", "").lower()
-            if "seattle" in name:
-                return httpx.Response(200, json=load("geocode_seattle.json"))
+            for city in ("seattle", "portland", "paris"):
+                if city in name:
+                    return httpx.Response(200, json=load(f"geocode_{city}.json"))
             return httpx.Response(200, json={"generationtime_ms": 0.1})
         if host == "api.open-meteo.com":
             return httpx.Response(200, json=load("forecast_seattle.json"))
@@ -79,16 +80,47 @@ async def _get(
         raise UpstreamError(f"{url} failed: {exc}") from exc
 
 
+# Another same-named place this big makes the name worth disambiguating out loud.
+AMBIGUOUS_MIN_POPULATION = 20_000
+
+
+def _label(r: dict[str, Any]) -> str:
+    """'Portland, Oregon' for US places, 'Paris, France' elsewhere."""
+    if r.get("country_code") == "US" and r.get("admin1"):
+        return f"{r['name']}, {r['admin1']}"
+    return f"{r['name']}, {r.get('country') or r.get('country_code') or ''}".rstrip(", ")
+
+
+def _matches(r: dict[str, Any], qualifier: str) -> bool:
+    q = qualifier.strip().lower()
+    return any(q == (r.get(k) or "").lower() for k in ("admin1", "country", "country_code"))
+
+
 async def geocode(http: httpx.AsyncClient, place: str) -> dict[str, Any] | None:
-    data = await _get(http, GEOCODE_URL, {"name": place, "count": 1, "language": "en", "format": "json"})
+    """Resolve a place name. Accepts 'Portland' or 'Portland, Maine'.
+
+    The result carries a spoken ``label`` and, if other sizeable places share the
+    name, ``alternatives`` (their labels) so the assistant can say which one it used.
+    """
+    name, _, qualifier = place.partition(",")
+    data = await _get(http, GEOCODE_URL, {"name": name.strip(), "count": 5, "language": "en", "format": "json"})
     results = data.get("results") or []
+    if qualifier.strip():
+        results = [r for r in results if _matches(r, qualifier)]
     if not results:
         return None
     r = results[0]
+    alternatives = [
+        _label(o) for o in results[1:]
+        if o["name"].lower() == r["name"].lower() and (o.get("population") or 0) >= AMBIGUOUS_MIN_POPULATION
+    ] if not qualifier.strip() else []
     return {
         "name": r["name"],
         "region": r.get("admin1"),
         "country_code": r.get("country_code"),
+        "label": _label(r),
+        "alternatives": alternatives,
+        "population": r.get("population"),
         "latitude": r["latitude"],
         "longitude": r["longitude"],
         "timezone": r.get("timezone", "auto"),

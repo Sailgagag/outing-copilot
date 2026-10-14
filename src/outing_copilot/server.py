@@ -61,7 +61,8 @@ def create_server(
     async def _locate(http: httpx.AsyncClient, place: str) -> dict[str, Any]:
         saved = store.get_place(place)
         if saved:
-            return saved
+            # Saved places are already settled: don't re-announce their ambiguity.
+            return {**saved, "alternatives": [], "nickname": place.strip().lower()}
         loc = await clients.geocode(http, place)
         if not loc:
             raise ValueError(f"I couldn't find a place called '{place}'.")
@@ -103,6 +104,18 @@ def create_server(
                 f"How many hours would you like?"
             )
 
+    def _where(loc: dict[str, Any]) -> str:
+        """Name to speak: the full label when the name is ambiguous, else the short name."""
+        return loc.get("label", loc["name"]) if loc.get("alternatives") else loc["name"]
+
+    def _place_notes(loc: dict[str, Any]) -> str:
+        notes = ""
+        if loc.get("alternatives"):
+            notes += f" I picked {loc['label']}; say {loc['alternatives'][0]} if you meant that one."
+        if loc.get("shadows_city"):
+            notes += f" I used your saved place {loc['nickname']}, not the city with that name."
+        return notes
+
     def _err(msg: str) -> dict[str, Any]:
         return {"ok": False, "speech": msg, "card": {"title": "Outing Copilot", "text": msg}}
 
@@ -138,7 +151,7 @@ def create_server(
         dayname = "today" if d == today else ("tomorrow" if (d - today).days == 1 else "on " + d.strftime("%A"))
         verdict = w.verdict()
         lead = {"go": "Good news", "maybe": "It's doable", "skip": "Honestly, I'd skip it"}[verdict]
-        speech = f"{lead}: the best time for a {act.label} in {loc['name']} {dayname} is {fmt_time(w.start)} to {fmt_time(w.end)}."
+        speech = f"{lead}: the best time for a {act.label} in {_where(loc)} {dayname} is {fmt_time(w.start)} to {fmt_time(w.end)}."
         if reasons:
             speech += " Watch out for " + ", ".join(reasons[:2]) + "."
         if tips:
@@ -149,6 +162,7 @@ def create_server(
             speech += f" There's an active {alerts[0]['event']} for this area."
         if d.isoformat() in hol:
             speech += f" It's {hol[d.isoformat()]}, so parks may be busy."
+        speech += _place_notes(loc)
         return {
             "ok": True,
             "speech": speech,
@@ -201,7 +215,7 @@ def create_server(
         from datetime import datetime as _dt
         bname = "today" if best["day"] == ranked[0]["day"] else best["weekday"]
         speech = (
-            f"For a {act.label} in {loc['name']}, {bname} looks best, around "
+            f"For a {act.label} in {_where(loc)}, {bname} looks best, around "
             f"{fmt_time(_dt.fromisoformat(best['start']))}."
         )
         worst = min(ranked, key=lambda r: r["score"])
@@ -211,6 +225,7 @@ def create_server(
         if unknown and sensitive:
             listed = unknown[0] if len(unknown) == 1 else ", ".join(unknown[:-1]) + " and " + unknown[-1]
             speech += f" Air-quality data isn't available yet for {listed}, so I scored those days cautiously."
+        speech += _place_notes(loc)
         return {"ok": True, "speech": speech, "place": loc, "activity": act.key, "best": best, "days": ranked,
                 "card": {"title": f"{act.label.title()} week · {loc['name']}",
                          "text": " | ".join(f"{r['weekday'][:3]} {r['score']}" for r in ranked)}}
@@ -223,13 +238,24 @@ def create_server(
             return _err("What should I call this place? Please give it a short name, like home or work.")
         try:
             async with clients.make_http_client(transport) as http:
-                loc = await clients.geocode(http, place)
+                loc, same_name = await asyncio.gather(clients.geocode(http, place), clients.geocode(http, nickname))
         except clients.UpstreamError as exc:
             return _err(str(exc))
         if not loc:
             return _err(f"I couldn't find a place called '{place}'.")
-        store.save_place(nickname, loc)
-        msg = f"Got it. I'll remember {nickname} as {loc['name']}{', ' + loc['region'] if loc.get('region') else ''}."
+        # Only warn for real, sizeable places with exactly that name (not hamlets or fuzzy matches).
+        shadows = bool(
+            same_name
+            and same_name["name"].lower() == nickname.lower()
+            and (same_name.get("population") or 0) >= clients.AMBIGUOUS_MIN_POPULATION
+        )
+        store.save_place(nickname, {**loc, "shadows_city": shadows})
+        msg = f"Got it. I'll remember {nickname} as {loc['label']}."
+        if loc.get("alternatives"):
+            msg += f" If you meant {loc['alternatives'][0]} instead, tell me."
+        if shadows:
+            msg += (f" Heads up: {same_name['label']} is also a real place. When you say {nickname}, "
+                    f"I'll use your saved place, {loc['label']}.")
         return {"ok": True, "speech": msg, "nickname": nickname.lower(), "place": loc,
                 "card": {"title": "Place saved", "text": msg}}
 
