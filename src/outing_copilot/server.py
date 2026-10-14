@@ -241,7 +241,10 @@ def create_server(
     def set_preferences(sensitive_to_air: bool | None = None, default_activity: str | None = None) -> dict[str, Any]:
         """Set household preferences. sensitive_to_air=True (asthma, kids, seniors) uses a stricter AQI limit of 50."""
         if default_activity is not None:
-            default_activity = resolve_activity(default_activity).key
+            try:
+                default_activity = resolve_activity(default_activity).key
+            except ValueError as exc:
+                return _err(str(exc))
         prefs = store.set_prefs(sensitive_to_air=sensitive_to_air, default_activity=default_activity)
         return {"ok": True, "speech": "Preferences updated.", "prefs": prefs}
 

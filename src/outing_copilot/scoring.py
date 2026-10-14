@@ -39,7 +39,9 @@ def resolve_activity(name: str) -> Activity:
     k = (name or "walk").strip().lower()
     k = ALIASES.get(k, k).replace(" ", "_")
     if k not in ACTIVITIES:
-        raise ValueError(f"Unknown activity '{name}'. Try one of: {', '.join(ACTIVITIES)}")
+        raise ValueError(
+            f"I don't know the activity {name}. Try a walk, run, bike ride, picnic, playground trip or dog walk."
+        )
     return ACTIVITIES[k]
 
 

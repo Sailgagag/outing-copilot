@@ -111,3 +111,11 @@ async def test_duration_bounds_accepted(server):
     for hours in (1, 6):
         r = await call(server, "find_best_time", {"place": "Seattle", "day": "tomorrow", "duration_hours": hours})
         assert r["ok"]
+
+
+async def test_set_preferences_bad_activity_is_friendly(server):
+    r = await call(server, "set_preferences", {"default_activity": "skydiving"})
+    assert r["ok"] is False
+    assert "skydiving" in r["speech"] and "Try a walk" in r["speech"]
+    assert set(r) >= {"ok", "speech", "card"}
+
