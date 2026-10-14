@@ -12,7 +12,8 @@ from typing import Any
 
 import httpx
 
-USER_AGENT = "outing-copilot/0.1 (+https://github.com/; open-source hackathon project)"
+# api.weather.gov requires an identifying User-Agent with contact details.
+USER_AGENT = "outing-copilot (+https://github.com/Sailgagag/outing-copilot; https://github.com/Sailgagag/outing-copilot/issues)"
 
 GEOCODE_URL = "https://geocoding-api.open-meteo.com/v1/search"
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
@@ -67,9 +68,11 @@ def make_http_client(transport: httpx.AsyncBaseTransport | None = None) -> httpx
     )
 
 
-async def _get(http: httpx.AsyncClient, url: str, params: dict[str, Any] | None = None) -> Any:
+async def _get(
+    http: httpx.AsyncClient, url: str, params: dict[str, Any] | None = None, headers: dict[str, str] | None = None
+) -> Any:
     try:
-        r = await http.get(url, params=params)
+        r = await http.get(url, params=params, headers=headers)
         r.raise_for_status()
         return r.json()
     except (httpx.HTTPError, ValueError) as exc:
@@ -131,7 +134,12 @@ async def holidays(http: httpx.AsyncClient, year: int, country: str) -> list[dic
 
 async def nws_alerts(http: httpx.AsyncClient, lat: float, lon: float) -> list[dict[str, Any]]:
     """Active US National Weather Service alerts (US locations only)."""
-    data = await _get(http, NWS_ALERTS_URL, {"point": f"{lat:.4f},{lon:.4f}"})
+    data = await _get(
+        http,
+        NWS_ALERTS_URL,
+        {"point": f"{lat:.4f},{lon:.4f}"},
+        headers={"User-Agent": USER_AGENT, "Accept": "application/geo+json"},
+    )
     out = []
     for f in data.get("features", []):
         p = f.get("properties", {})
