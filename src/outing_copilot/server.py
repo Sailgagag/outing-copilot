@@ -193,7 +193,7 @@ def create_server(
         if not wins:
             return _err("That day is outside my 7-day forecast window, or there's no daylight left today.")
         d, w = max(wins, key=lambda x: x[1].score)
-        reasons = _dedupe([r for hs in w.hours for r in hs.reasons])
+        reasons = [r for r in _dedupe([r for hs in w.hours for r in hs.reasons]) if r != "air quality unknown"]  # spoken separately below
         tips = gear_tips(w)
         dayname = "today" if d == today else ("tomorrow" if (d - today).days == 1 else "on " + d.strftime("%A"))
         verdict = w.verdict()
@@ -204,7 +204,7 @@ def create_server(
         if tips:
             speech += " Tip: " + tips[0] + "."
         if w.aqi_unknown and sensitive:
-            speech += " I don't have air-quality data for that time yet, so I scored it cautiously."
+            speech += " Heads up: air-quality data isn't available that far out, so I've docked that time slot."
         if alerts:
             speech += f" There's an active {alerts[0]['event']} for this area."
         if d.isoformat() in hol:
@@ -271,7 +271,7 @@ def create_server(
         unknown = [r["weekday"] for r in ranked if r["air_quality"] == "unknown"]
         if unknown and sensitive:
             listed = unknown[0] if len(unknown) == 1 else ", ".join(unknown[:-1]) + " and " + unknown[-1]
-            speech += f" Air-quality data isn't available yet for {listed}, so I scored those days cautiously."
+            speech += f" Heads up: air-quality data isn't available that far out for {listed}, so I've docked those days."
         speech += _place_notes(loc)
         return {"ok": True, "speech": speech, "place": loc, "activity": act.key, "best": best, "days": ranked,
                 "card": {"title": f"{act.label.title()} week · {loc['name']}",

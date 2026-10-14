@@ -95,7 +95,7 @@ async def test_week_outlook_asthma_flags_unknown_air_days(server):
     unknown = [d for d in r["days"] if d["air_quality"] == "unknown"]
     assert unknown, "days 6-7 have no AQI upstream"
     assert all(d["score"] < 100 for d in unknown)
-    assert "Air-quality data isn't available yet" in r["speech"]
+    assert "air-quality data isn't available that far out" in r["speech"]
     assert unknown[-1]["weekday"] in r["speech"]
 
 

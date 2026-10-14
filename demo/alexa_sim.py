@@ -33,6 +33,8 @@ SCRIPT = [
     ("Could we do a two-hour picnic this weekend?", "find_best_time",
      {"place": "home", "activity": "picnic", "day": "weekend", "duration_hours": 2}),
     ("Which day this week is best for a run?", "week_outlook", {"place": "home", "activity": "run"}),
+    ("We're visiting Portland tomorrow. When should we go for a walk?", "find_best_time",
+     {"place": "Portland", "activity": "walk", "day": "tomorrow"}),
 ]
 
 

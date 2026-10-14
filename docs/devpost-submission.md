@@ -33,7 +33,7 @@ and household preferences such as asthma (which switches to a stricter AQI limit
 
 It is careful about what it doesn't know. Air-quality forecasts only cover the first four to five
 days, so later days are marked unknown; in asthma mode those days are scored cautiously and the
-answer says so ("Air-quality data isn't available yet for Monday and Tuesday…"). Ambiguous places
+answer says so ("Heads up: air-quality data isn't available that far out for Monday and Tuesday, so I've docked those days."). Ambiguous places
 are named out loud ("I picked Portland, Oregon; say Portland, Maine if you meant that one"), and a
 nickname that is also a real city triggers a heads-up. Every error — a missing place, an
 out-of-range duration, an unknown activity, a service outage — comes back as one speakable sentence.
