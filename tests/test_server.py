@@ -97,3 +97,17 @@ async def test_week_outlook_asthma_flags_unknown_air_days(server):
     assert all(d["score"] < 100 for d in unknown)
     assert "Air-quality data isn't available yet" in r["speech"]
     assert unknown[-1]["weekday"] in r["speech"]
+
+
+@pytest.mark.parametrize("tool", ["find_best_time", "week_outlook"])
+@pytest.mark.parametrize("hours", [0, 7, -2, 24])
+async def test_duration_out_of_range_is_spoken(server, tool, hours):
+    r = await call(server, tool, {"place": "Seattle", "duration_hours": hours})
+    assert r["ok"] is False
+    assert r["speech"].startswith("I can plan outings from 1 to 6 hours long")
+
+
+async def test_duration_bounds_accepted(server):
+    for hours in (1, 6):
+        r = await call(server, "find_best_time", {"place": "Seattle", "day": "tomorrow", "duration_hours": hours})
+        assert r["ok"]

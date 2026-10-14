@@ -29,6 +29,8 @@ INSTRUCTIONS = (
     "for screens. Users can save places by nickname (e.g. 'home', 'grandma') and then use the nickname."
 )
 
+MIN_DURATION, MAX_DURATION = 1, 6
+
 READ_ONLY = ToolAnnotations(readOnlyHint=True, openWorldHint=True)
 
 
@@ -94,6 +96,13 @@ def create_server(
         except clients.UpstreamError:
             return []
 
+    def _check_duration(duration_hours: int) -> None:
+        if not MIN_DURATION <= duration_hours <= MAX_DURATION:
+            raise ValueError(
+                f"I can plan outings from {MIN_DURATION} to {MAX_DURATION} hours long. "
+                f"How many hours would you like?"
+            )
+
     def _err(msg: str) -> dict[str, Any]:
         return {"ok": False, "speech": msg, "card": {"title": "Outing Copilot", "text": msg}}
 
@@ -106,6 +115,7 @@ def create_server(
         playground or dog_walk. day: today, tomorrow, weekend, a weekday name, or YYYY-MM-DD.
         """
         try:
+            _check_duration(duration_hours)
             act = resolve_activity(activity)
             async with clients.make_http_client(transport) as http:
                 loc = await _locate(http, place)
@@ -164,6 +174,7 @@ def create_server(
     async def week_outlook(place: str, activity: str = "walk", duration_hours: int = 1) -> dict[str, Any]:
         """Rank the next 7 days for an activity and return the best day with its best window."""
         try:
+            _check_duration(duration_hours)
             act = resolve_activity(activity)
             async with clients.make_http_client(transport) as http:
                 loc = await _locate(http, place)
