@@ -120,6 +120,7 @@ async def geocode(http: httpx.AsyncClient, place: str) -> dict[str, Any] | None:
         "country_code": r.get("country_code"),
         "label": _label(r),
         "alternatives": alternatives,
+        "qualified": bool(qualifier.strip()),
         "population": r.get("population"),
         "latitude": r["latitude"],
         "longitude": r["longitude"],

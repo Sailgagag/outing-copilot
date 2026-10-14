@@ -153,7 +153,7 @@ def create_server(
 
     def _where(loc: dict[str, Any]) -> str:
         """Name to speak: the full label when the name is ambiguous, else the short name."""
-        return loc.get("label", loc["name"]) if loc.get("alternatives") else loc["name"]
+        return loc.get("label", loc["name"]) if (loc.get("alternatives") or loc.get("qualified")) else loc["name"]
 
     def _place_notes(loc: dict[str, Any]) -> str:
         notes = ""

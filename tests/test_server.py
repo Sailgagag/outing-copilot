@@ -144,6 +144,7 @@ async def test_ambiguous_city_is_named_in_speech(server):
 async def test_qualified_city_is_not_ambiguous(server):
     r = await call(server, "find_best_time", {"place": "Portland, Maine", "day": "tomorrow"})
     assert r["ok"] and r["place"]["region"] == "Maine"
+    assert "in Portland, Maine" in r["speech"]
     assert "if you meant" not in r["speech"]
 
 
