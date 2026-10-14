@@ -14,7 +14,9 @@ from typing import Any
 
 import httpx
 from mcp.server.mcpserver import MCPServer
-from mcp.types import ToolAnnotations
+from mcp.server.mcpserver.exceptions import ToolError
+from mcp.types import CallToolResult, TextContent, ToolAnnotations
+from pydantic import ValidationError
 
 from . import clients
 from .scoring import (
@@ -32,6 +34,51 @@ INSTRUCTIONS = (
 MIN_DURATION, MAX_DURATION = 1, 6
 
 READ_ONLY = ToolAnnotations(readOnlyHint=True, openWorldHint=True)
+
+
+FIELD_LABELS = {
+    "place": "the place",
+    "activity": "the activity",
+    "day": "the day",
+    "duration_hours": "how many hours",
+    "nickname": "a name for the place",
+    "sensitive_to_air": "whether anyone is sensitive to air quality",
+    "default_activity": "the default activity",
+}
+
+
+def spoken_validation_error(exc: ValidationError) -> str:
+    """Turn a raw pydantic error into one sentence a voice assistant can read out."""
+    err = exc.errors()[0]
+    field = str(err["loc"][0]) if err.get("loc") else ""
+    label = FIELD_LABELS.get(field, field.replace("_", " ") or "that")
+    kind = err.get("type", "")
+    if kind == "missing":
+        return f"I need {label} to do that. Could you tell me?"
+    if kind.startswith("int") or kind.startswith("float"):
+        return f"For {label}, please use a whole number, like 2."
+    if kind.startswith("bool"):
+        return f"For {label}, please answer yes or no."
+    if kind.startswith("string"):
+        return f"For {label}, please use a word or name, like Seattle."
+    return f"Sorry, I didn't understand {label}. Could you say it another way?"
+
+
+class OutingServer(MCPServer):
+    """MCPServer whose argument-validation errors come back as friendly, speakable results."""
+
+    async def call_tool(self, name, arguments, context=None):  # type: ignore[override]
+        try:
+            return await super().call_tool(name, arguments, context)
+        except ToolError as exc:
+            if not isinstance(exc.__cause__, ValidationError):
+                raise
+            speech = spoken_validation_error(exc.__cause__)
+            return CallToolResult(
+                content=[TextContent(type="text", text=speech)],
+                structured_content={"ok": False, "speech": speech, "card": {"title": "Outing Copilot", "text": speech}},
+                is_error=True,
+            )
 
 
 def create_server(
@@ -56,7 +103,7 @@ def create_server(
                 seen.add(key); out.append(r)
         return out
 
-    mcp = MCPServer(name="outing-copilot", title="Outing Copilot", version="0.1.0", instructions=INSTRUCTIONS)
+    mcp = OutingServer(name="outing-copilot", title="Outing Copilot", version="0.1.0", instructions=INSTRUCTIONS)
 
     async def _locate(http: httpx.AsyncClient, place: str) -> dict[str, Any]:
         saved = store.get_place(place)

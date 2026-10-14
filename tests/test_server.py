@@ -163,3 +163,23 @@ async def test_nickname_that_is_a_real_city_warns(server):
 async def test_ordinary_nickname_has_no_warning(server):
     r = await call(server, "remember_place", {"nickname": "home", "place": "Seattle"})
     assert "Heads up" not in r["speech"]
+
+
+@pytest.mark.parametrize(
+    "tool,args,expected",
+    [
+        ("find_best_time", {}, "I need the place to do that."),
+        ("find_best_time", {"place": "Seattle", "duration_hours": "lots"}, "For how many hours, please use a whole number"),
+        ("week_outlook", {"place": 42}, "For the place, please use a word or name"),
+        ("set_preferences", {"sensitive_to_air": "kinda"}, "please answer yes or no"),
+        ("remember_place", {"place": "Seattle"}, "I need a name for the place"),
+    ],
+)
+async def test_validation_errors_are_spoken(server, tool, args, expected):
+    async with Client(server) as c:
+        r = await c.call_tool(tool, args)
+    assert r.is_error
+    text = r.content[0].text
+    assert expected in text
+    assert "validation error" not in text and "pydantic" not in text
+    assert r.structured_content["ok"] is False and r.structured_content["speech"] == text
